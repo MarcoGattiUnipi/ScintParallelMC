@@ -9,11 +9,14 @@ include_directories(${PROJECT_SOURCE_DIR}/include)
 
 add_library(PhotonTransport
     src/PhotonTransport.cpp
+    src/PhotonSimulation.cpp
 )
 
 target_include_directories(PhotonTransport
     PUBLIC
     ${PROJECT_SOURCE_DIR}/include
 )
+
+enable_testing()
 
 add_subdirectory(tests)

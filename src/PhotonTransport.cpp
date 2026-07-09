@@ -99,3 +99,40 @@ double incidenceAngleDeg(
 
     return std::acos(c)*180.0/M_PI;
 }
+
+Vec3 isotropicDir(
+    double cosTheta,
+    double phi
+)
+{
+    double s = std::sqrt(
+        std::max(0.0, 1.0 - cosTheta * cosTheta)
+    );
+
+    return {
+        s * std::cos(phi),
+        s * std::sin(phi),
+        cosTheta
+    };
+}
+
+double criticalAngleDeg(
+    double n_in,
+    double n_out
+)
+{
+    if (n_in <= n_out)
+    {
+        return 90.0;
+    }
+
+    double ratio = n_out / n_in;
+
+    ratio = std::clamp(
+        ratio,
+        0.0,
+        1.0
+    );
+
+    return std::asin(ratio) * 180.0 / PI;
+}

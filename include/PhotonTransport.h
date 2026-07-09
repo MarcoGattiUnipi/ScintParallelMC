@@ -22,3 +22,14 @@ StepResult nextIntersection(
     const Vec3& dir,
     const Box& box
 );
+
+Vec3 isotropicDir(
+    double cosTheta,
+    double phi
+);
+
+
+double criticalAngleDeg(
+    double n_in,
+    double n_out
+);
