@@ -1,4 +1,6 @@
 #include "PhotonTransport.h"
+#include <cmath>
+#include <algorithm>
 
 StepResult nextIntersection(
     const Vec3& pos,
@@ -11,7 +13,7 @@ StepResult nextIntersection(
     double tmin = INF;
     Face face = Z_POS;
 
-    auto update = [&](le t, Face f
+    auto update = [&](double t, Face f)
     {
         if(t > 1e-12 && t < tmin)
         {
