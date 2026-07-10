@@ -68,3 +68,20 @@ add_test(
     NAME ManyPhotonsGPUTest
     COMMAND TestManyPhotonsGPU 10000
 )
+
+add_executable(TestManyPhotonsGPUReal
+    TestManyPhotonsGPUReal.cu
+)
+
+target_link_libraries(TestManyPhotonsGPUReal
+    PhotonCUDA
+)
+
+set_target_properties(TestManyPhotonsGPUReal PROPERTIES
+    CUDA_ARCHITECTURES 61
+)
+
+add_test(
+    NAME ManyPhotonsGPURealTest
+    COMMAND TestManyPhotonsGPUReal 10000
+)

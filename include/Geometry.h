@@ -1,6 +1,11 @@
 #pragma once
 
 #include <cmath>
+#ifdef __CUDACC__
+#define HD __host__ __device__
+#else
+#define HD
+#endif
 
 constexpr double PI = 3.14159265358979323846;
 
@@ -11,17 +16,17 @@ struct Vec3
     double z;
 };
 
-inline double Dot(const Vec3& a, const Vec3& b)
+HD inline double Dot(const Vec3& a, const Vec3& b)
 {
     return a.x*b.x + a.y*b.y + a.z*b.z;
 }
 
-inline double Norm(const Vec3& v)
+HD inline double Norm(const Vec3& v)
 {
     return std::sqrt(Dot(v, v));
 }
 
-inline Vec3 Normalize(const Vec3& v)
+HD inline Vec3 Normalize(const Vec3& v)
 {
     double n = Norm(v);
 
@@ -36,7 +41,7 @@ inline Vec3 Normalize(const Vec3& v)
     };
 }
 
-inline Vec3 Add(const Vec3& a, const Vec3& b)
+HD inline Vec3 Add(const Vec3& a, const Vec3& b)
 {
     return {
         a.x + b.x,
@@ -45,7 +50,7 @@ inline Vec3 Add(const Vec3& a, const Vec3& b)
     };
 }
 
-inline Vec3 Scale(const Vec3& v, double s)
+HD inline Vec3 Scale(const Vec3& v, double s)
 {
     return {
         s * v.x,
