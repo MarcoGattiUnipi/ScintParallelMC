@@ -100,3 +100,20 @@ add_test(
             many_photons_cpu_summary.csv
             many_photons_gpu_summary.csv
 )
+
+add_executable(TestEventBatchGPU
+    TestEventBatchGPU.cu
+)
+
+target_link_libraries(TestEventBatchGPU
+    PhotonCUDA
+)
+
+set_target_properties(TestEventBatchGPU PROPERTIES
+    CUDA_ARCHITECTURES 61
+)
+
+add_test(
+    NAME EventBatchGPUTest
+    COMMAND TestEventBatchGPU 2 10000 30.0 event_batch_gpu_summary.csv
+)

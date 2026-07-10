@@ -609,3 +609,150 @@ void launchPhotonSimulationKernel(
         baseSeed
     );
 }
+
+__global__
+void eventBatchArrivalHistogramKernel(
+    unsigned int* histZ0,
+    unsigned int* histZL,
+    int nEvents,
+    int photonsPerEvent,
+    PhotonConfig config,
+    double zCenter,
+    double zHalfWidth,
+    double tMin,
+    double tMax,
+    int nBins,
+    unsigned long long baseSeed
+)
+{
+    unsigned long long globalPhotonId =
+        blockIdx.x * blockDim.x + threadIdx.x;
+
+    unsigned long long totalPhotons =
+        static_cast<unsigned long long>(nEvents) *
+        static_cast<unsigned long long>(photonsPerEvent);
+
+    if (globalPhotonId >= totalPhotons)
+    {
+        return;
+    }
+
+    int eventId =
+        static_cast<int>(
+            globalPhotonId /
+            static_cast<unsigned long long>(photonsPerEvent)
+        );
+
+    int photonId =
+        static_cast<int>(
+            globalPhotonId %
+            static_cast<unsigned long long>(photonsPerEvent)
+        );
+
+    PhotonConfig localConfig = config;
+
+    localConfig.z0 = zCenter - zHalfWidth;
+    localConfig.z1 = zCenter + zHalfWidth;
+
+    unsigned long long photonSeedId =
+        static_cast<unsigned long long>(eventId) *
+        static_cast<unsigned long long>(photonsPerEvent)
+        +
+        static_cast<unsigned long long>(photonId);
+
+    RNGState rng;
+
+    rng.state =
+        makePhotonSeedDevice(
+            baseSeed,
+            photonSeedId
+        );
+
+    PhotonResult result =
+        simulatePhotonDevice(
+            localConfig,
+            rng
+        );
+
+    if (!result.detected)
+    {
+        return;
+    }
+
+    if (result.arrivalTime < tMin || result.arrivalTime >= tMax)
+    {
+        return;
+    }
+
+    double binWidth =
+        (tMax - tMin) / static_cast<double>(nBins);
+
+    int bin =
+        static_cast<int>(
+            (result.arrivalTime - tMin) / binWidth
+        );
+
+    if (bin < 0 || bin >= nBins)
+    {
+        return;
+    }
+
+    int index =
+        eventId * nBins + bin;
+
+    if (result.detectorFace == Z_NEG)
+    {
+        atomicAdd(
+            &histZ0[index],
+            1u
+        );
+    }
+    else if (result.detectorFace == Z_POS)
+    {
+        atomicAdd(
+            &histZL[index],
+            1u
+        );
+    }
+}
+
+void launchEventBatchArrivalHistogramKernel(
+    unsigned int* d_histZ0,
+    unsigned int* d_histZL,
+    int nEvents,
+    int photonsPerEvent,
+    PhotonConfig config,
+    double zCenter,
+    double zHalfWidth,
+    double tMin,
+    double tMax,
+    int nBins,
+    unsigned long long baseSeed
+)
+{
+    constexpr int threadsPerBlock = 256;
+
+    unsigned long long totalPhotons =
+        static_cast<unsigned long long>(nEvents) *
+        static_cast<unsigned long long>(photonsPerEvent);
+
+    int blocks =
+        static_cast<int>(
+            (totalPhotons + threadsPerBlock - 1ULL) /
+            threadsPerBlock
+        );
+
+    eventBatchArrivalHistogramKernel<<<blocks, threadsPerBlock>>>(
+        d_histZ0,
+        d_histZL,
+        nEvents,
+        photonsPerEvent,
+        config,
+        zCenter,
+        zHalfWidth,
+        tMin,
+        tMax,
+        nBins,
+        baseSeed
+    );
+}

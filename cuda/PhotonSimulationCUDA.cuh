@@ -13,3 +13,17 @@ void launchPhotonSimulationKernel(
     PhotonConfig config,
     unsigned long long baseSeed
 );
+
+void launchEventBatchArrivalHistogramKernel(
+    unsigned int* d_histZ0,
+    unsigned int* d_histZL,
+    int nEvents,
+    int photonsPerEvent,
+    PhotonConfig config,
+    double zCenter,
+    double zHalfWidth,
+    double tMin,
+    double tMax,
+    int nBins,
+    unsigned long long baseSeed
+);
