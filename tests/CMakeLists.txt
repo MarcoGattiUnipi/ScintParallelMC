@@ -36,3 +36,16 @@ add_test(
     NAME SinglePhotonTest
     COMMAND TestSinglePhoton
 )
+
+add_executable(TestManyPhotonsCPU
+    TestManyPhotonsCPU.cpp
+)
+
+target_link_libraries(TestManyPhotonsCPU
+    PhotonTransport
+)
+
+add_test(
+    NAME ManyPhotonsCPUTest
+    COMMAND TestManyPhotonsCPU 10000 many_photons_cpu_summary.csv
+)
