@@ -85,3 +85,18 @@ add_test(
     NAME ManyPhotonsGPURealTest
     COMMAND TestManyPhotonsGPUReal 10000
 )
+
+add_executable(CompareCPUvsGPU
+    CompareCPUvsGPU.cpp
+)
+
+target_link_libraries(CompareCPUvsGPU
+    PhotonTransport
+)
+
+add_test(
+    NAME CompareCPUvsGPUTest
+    COMMAND CompareCPUvsGPU
+            many_photons_cpu_summary.csv
+            many_photons_gpu_summary.csv
+)

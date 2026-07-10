@@ -3,8 +3,13 @@
 
 #include <cuda_runtime.h>
 
+
+#include <array>
+#include <cmath>
 #include <cstdlib>
+#include <fstream>
 #include <iostream>
+#include <string>
 #include <vector>
 
 static void checkCuda(
@@ -30,6 +35,7 @@ int main(
 )
 {
     unsigned long long nPhotons = 100000ULL;
+    std::string outputFile = "many_photons_gpu_summary.csv";
 
     if (argc >= 2)
     {
@@ -166,6 +172,41 @@ int main(
     std::cout << "Max bounces      : " << nMaxBounces << "\n";
     std::cout << "Numerical errors : " << nNumericalError << "\n";
     std::cout << "----------------------------------------\n";
+
+    std::ofstream fout(outputFile);
+
+    if (!fout)
+    {
+        std::cerr << "Error: cannot open output file "
+                  << outputFile << "\n";
+
+        return 1;
+    }
+
+    fout << "quantity,value\n";
+
+    fout << "n_photons," << nPhotons << "\n";
+    fout << "n_detected," << nDetected << "\n";
+    fout << "n_detected_z0," << nDetectedZ0 << "\n";
+    fout << "n_detected_zL," << nDetectedZL << "\n";
+
+    fout << "n_absorbed_wall," << nAbsorbedWall << "\n";
+    fout << "n_absorbed_volume," << nAbsorbedVolume << "\n";
+    fout << "n_max_bounces," << nMaxBounces << "\n";
+    fout << "n_numerical_error," << nNumericalError << "\n";
+
+    double efficiency = NAN;
+
+    if (nPhotons > 0ULL)
+    {
+        efficiency =
+            static_cast<double>(nDetected) /
+            static_cast<double>(nPhotons);
+    }
+
+    fout << "efficiency," << efficiency << "\n";
+
+    fout.close();
 
     if (nNumericalError == nPhotons)
     {
