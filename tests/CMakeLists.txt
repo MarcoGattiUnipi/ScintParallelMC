@@ -117,3 +117,22 @@ add_test(
     NAME EventBatchGPUTest
     COMMAND TestEventBatchGPU 2 10000 30.0 event_batch_gpu_summary.csv
 )
+
+add_executable(TestEventWaveformsROOT
+    TestEventWaveformsROOT.cpp
+)
+
+target_link_libraries(TestEventWaveformsROOT
+    PhotonCUDA
+    PMTResponseROOT
+    CUDA::cudart
+    ROOT::Core
+    ROOT::Hist
+    ROOT::RIO
+    ROOT::Tree
+)
+
+add_test(
+    NAME EventWaveformsROOTTest
+    COMMAND TestEventWaveformsROOT 2 10000 30.0 event_waveforms.root
+)

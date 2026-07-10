@@ -14,6 +14,11 @@ set(CMAKE_CUDA_STANDARD_REQUIRED ON)
 
 include_directories(${PROJECT_SOURCE_DIR}/include)
 
+
+find_package(CUDAToolkit REQUIRED)
+find_package(ROOT REQUIRED COMPONENTS Core Hist RIO Tree)
+
+
 add_library(PhotonTransport
     src/PhotonTransport.cpp
     src/PhotonSimulation.cpp
@@ -34,6 +39,25 @@ target_include_directories(PhotonCUDA
     ${PROJECT_SOURCE_DIR}/include
     ${PROJECT_SOURCE_DIR}/cuda
 )
+
+
+add_library(PMTResponseROOT
+    src/PMTResponseROOT.cpp
+)
+
+target_include_directories(PMTResponseROOT
+    PUBLIC
+    ${PROJECT_SOURCE_DIR}/include
+)
+
+target_link_libraries(PMTResponseROOT
+    PUBLIC
+    ROOT::Core
+    ROOT::Hist
+    ROOT::RIO
+    ROOT::Tree
+)
+
 
 
 
