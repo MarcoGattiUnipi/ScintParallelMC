@@ -136,3 +136,22 @@ add_test(
     NAME EventWaveformsROOTTest
     COMMAND TestEventWaveformsROOT 2 10000 30.0 event_waveforms.root
 )
+
+add_executable(TestScanWaveformsROOT
+    TestScanWaveformsROOT.cpp
+)
+
+target_link_libraries(TestScanWaveformsROOT
+    PhotonCUDA
+    PMTResponseROOT
+    CUDA::cudart
+    ROOT::Core
+    ROOT::Hist
+    ROOT::RIO
+    ROOT::Tree
+)
+
+add_test(
+    NAME ScanWaveformsROOTTest
+    COMMAND TestScanWaveformsROOT 1 10000 0.5 20.5 10.0 scan_waveforms_test.root
+)
