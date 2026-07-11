@@ -6,19 +6,34 @@
 
 namespace
 {
-    constexpr double E_CHARGE     = 1.602e-19;
-    constexpr double GAIN         = 5.0e5;
-    constexpr double Q_MEAN_PC    = GAIN * E_CHARGE * 1.0e12;
+    constexpr double E_CHARGE     = 1.602e-19; // elementary charge in Coulombs
+    constexpr double GAIN         = 5.0e5;// typical PMT gain, unitless
+    constexpr double Q_MEAN_PC    = GAIN * E_CHARGE * 1.0e12;// mean charge per photoelectron in picoCoulombs
 
     constexpr double TAU_RISE     = 3.5;
     constexpr double IMPEDANCE    = 50.0;
 
-    constexpr double QE           = 0.28;
-    constexpr double GAIN_RES     = 0.20;
+    constexpr double QE           = 0.28;//quantity of photoelectrons produced per incident photon  
+    constexpr double GAIN_RES     = 0.20;//relative standard deviation of the PMT gain
 
-    constexpr double TRANSIT_TIME = 35.0;
+    constexpr double TRANSIT_TIME = 35.0;//transit time of the PMT in nanoseconds
     constexpr double TTS_SIGMA    = 1.5;
 }
+
+
+/*
+    Convert a photon arrival-time histogram into a PMT voltage waveform.
+
+    For each time bin of the input histogram:
+      1. read the number of photons arriving at the photocathode;
+      2. loop over the photons in that bin;
+      3. apply the quantum efficiency;
+      4. sample the PMT gain fluctuation;
+      5. sample transit time and transit time spread;
+      6. add the corresponding single-photoelectron response to the
+         output waveform. Exp(-t^2/(2*tau^2)) is used for the single-photoelectron response.
+*/
+
 
 TH1D* SimulatePMTWaveformROOT(
     const TH1D* hPhotons,

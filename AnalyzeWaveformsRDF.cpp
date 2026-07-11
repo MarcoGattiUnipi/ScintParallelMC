@@ -11,12 +11,54 @@
 #include <string>
 #include <vector>
 
+/*
+    RDataFrame analysis of the simulated PMT waveforms.
+
+    This file performs the final physics analysis of the project.
+
+    The input ROOT file is produced by TestScanWaveformsROOT.cpp and contains
+    one TTree entry per simulated event. Each event stores the PMT waveforms
+    for the two ends of the scintillator bar:
+
+        waveform_z0  -> PMT at z = 0
+        waveform_zL  -> PMT at z = L
+
+    The goal of this analysis is to estimate the effective propagation
+    velocity of light inside the scintillator bar.
+
+    For each event:
+      1. extract a timing value from waveform_z0;
+      2. extract a timing value from waveform_zL;
+      3. compute DeltaT = tL - t0.
+
+    The dependence of DeltaT on the scintillation position z is then fitted
+    with a straight line:
+
+        DeltaT(z) = q + m z
+
+    Assuming PMTs at z = 0 and z = L:
+
+        t0(z) = offset0 + z / v
+        tL(z) = offsetL + (L - z) / v
+
+    therefore:
+
+        DeltaT(z) = tL - t0
+                  = q - 2 z / v
+
+    and the effective propagation velocity is obtained as:
+
+        v = -2 / m
+
+    where z is expressed in cm and time in ns, giving v in cm/ns.
+*/
+
 using Waveform_t = std::vector<float>;
 
-static double gSamplingNs = 0.5;
-static double gFraction = 0.20;
+static double gSamplingNs = 0.5; // sampling interval of the PMT waveform in nanoseconds
+static double gFraction = 0.20; // fraction of the peak amplitude to use for timing
 
-double FindFractionalTimeNegativePulse(
+double FindFractionalTimeNegativePulse( //extract a timing value from a negative-going pulse waveform using fractional threshold
     const Waveform_t& waveform,
     double samplingNs,
     double fraction
@@ -75,7 +117,7 @@ double FindFractionalTimeNegativePulse(
 
     return NAN;
 }
-
+/*Various helper for RDF becasue inline functions wouldn't work*/
 double RDF_T0Fractional(
     const Waveform_t& waveform
 )
@@ -116,6 +158,32 @@ bool RDF_IsFinite2(
         std::isfinite(b);
 }
 
+/*
+    Main analysis function.
+
+    inputs:
+      - filename:
+          ROOT file containing the Events TT*ee produced by the simulation
+          workflow.
+
+      - barLengthCm:
+          length of the scintillator bar in cm.
+
+      - samplingNs:
+          sampling step of the stored waveforms in ns.
+
+      - fraction:
+          fraction of the maximum pulse amplitude used for timing extraction.
+
+    The function:
+      1. opens the Events TTree with ROOT::RDataFrame;
+      2. defines new columns t0_frac, tL_frac and delta_t;
+      3. fills a TGraphErrors with DeltaT as a function of z_center;
+      4. fits the graph with a linear function;
+      5. extracts the effective light propagation velocity;
+      6. stores the analysis results in a ROOT file and saves a PDF plot.
+*/
+
 void AnalyzePropagationVelocityRDF(
     const char* filename = "scan_waveforms.root",
     double barLengthCm = 280.0,
@@ -125,7 +193,12 @@ void AnalyzePropagationVelocityRDF(
 {
     gSamplingNs = samplingNs;
     gFraction = fraction;
+/*
+    Create an RDataFrame connected to the simulated event tree.
 
+    Each row corresponds to one simulated event at a given z position.
+    The waveform branches are processed event by event.
+*/
     ROOT::RDataFrame df(
         "Events",
         filename
@@ -151,7 +224,12 @@ void AnalyzePropagationVelocityRDF(
               RDF_IsFinite2,
               {"t0_frac", "tL_frac"}
           );
+/*
+    Materialize the z positions and DeltaT values.
 
+    These arrays are used to build a TGraphErrors, which is then fitted with
+    a straight line.
+*/
     auto zValues =
         dfTiming.Take<double>(
             "z_center"
@@ -173,7 +251,7 @@ void AnalyzePropagationVelocityRDF(
 
         return;
     }
-
+//creating graphs, canvas and saving the results to a ROOT file and a PDF plot
     TGraphErrors* gDeltaT =
         new TGraphErrors();
 
@@ -286,7 +364,15 @@ void AnalyzePropagationVelocityRDF(
         "tL_frac",
         "delta_t"
     };
+    /*
+    Store the derived analysis quantities in a separate ROOT file.
 
+    This file contains one entry per event after the timing selection and can
+    be used for further checks without recomputing the waveform timing.
+
+    mainly used for debugging and validation of the analysis workflow.
+    */
+*/
     dfTiming.Snapshot(
         "VelocityAnalysis",
         "analysis/propagation_velocity_analysis.root",

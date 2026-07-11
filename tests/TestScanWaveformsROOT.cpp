@@ -15,6 +15,47 @@
 #include <string>
 #include <vector>
 
+/*
+    Full scan workflow for the scintillator photon Monte Carlo simulation.
+
+    This executable performs the complete production chain used in the
+    project:
+
+      1. scan the scintillator bar at different z positions;
+      2. for each position, simulate several independent events;
+      3. for each event, simulate photonsPerEvent optical photons on the GPU;
+      4. fill event-by-event photon arrival-time histograms for the two PMT
+         faces, z = 0 and z = L;
+      5. copy the histograms back to the CPU;
+      6. convert the arrival-time histograms into PMT voltage waveforms
+         using ROOT;
+      7. store event-level quantities and waveforms in a ROOT TTree.
+
+    The division of responsibilities is intentional:
+
+        GPU:
+            optical photon transport and arrival-time histogramming
+
+        CPU/ROOT:
+            PMT response, waveform construction and data storage
+
+    This keeps ROOT objects such as TH1D and TTree outside CUDA kernels while
+    still accelerating the computationally expensive photon propagation.
+*/
+
+
+/*
+    Helper function used to check CUDA runtime calls.
+
+    If a CUDA call fails, the function prints the error message and stops the
+    program. This makes debugging easier because the program fails immediately
+    at the point where the CUDA error occurs.
+
+    The function is used after memory allocations, memory transfers, event
+    operations and kernel launches.
+*/
+
+
 static void checkCuda(
     cudaError_t err,
     const char* message
@@ -44,6 +85,27 @@ static std::string makeName(
            "_event_" +
            std::to_string(eventId);
 }
+
+/*
+    Default scan configur*tion.
+
+    The command-line arguments can override these values:
+
+        argv[1] -> number of events per z position
+        argv[2] -> number of photons per event
+        ar*v[3] -> first z position of the scan
+        argv[4] -> last z position of the scan
+        argv[5] -> z scan step
+        argv[6] -> output ROOT filename
+
+    Example:
+
+        ./TestScanWaveformsROOT 10 80000 0.5 279.5 10.0 scan_waveforms.root
+
+    This simulates 10 events per position, 80000 photons per event, scanning
+    the full scintillator bar every 10 cm.
+*/
+
 
 int main(
     int argc,
@@ -124,6 +186,8 @@ int main(
 
     unsigned long long baseSeed = 12345ULL;
 
+    //building the box configuration for the scintillator bar and the PMT faces at the ends of the bar
+
     PhotonConfig config;
 
     config.reflectivity = 0.98;
@@ -155,6 +219,8 @@ int main(
     unsigned int* dHistZ0 = nullptr;
     unsigned int* dHistZL = nullptr;
 
+    //memory allocation on the GPU for the arrival time histograms of the two PMT faces, z=0 and z=L
+
     checkCuda(
         cudaMalloc(
             reinterpret_cast<void**>(&dHistZ0),
@@ -177,6 +243,8 @@ int main(
     cudaEvent_t gpuStart;
     cudaEvent_t gpuStop;
 
+    //create CUDA events to measure the GPU execution time of the photon transport kernel
+
     checkCuda(cudaEventCreate(&gpuStart), "cudaEventCreate gpuStart");
     checkCuda(cudaEventCreate(&gpuStop),  "cudaEventCreate gpuStop");
 
@@ -193,6 +261,22 @@ int main(
 
         return 1;
     }
+
+    /*
+    Output event tree.
+
+    Each entry of this TTree corresponds to one simulated event at one scan
+    position.
+
+    Stored information includes:
+      - event and position identifiers;
+      - z position of the scintillation region;
+      - number of photons detected by each PMT;
+      - mean photon arrival times;
+      - binned arrival-time histograms;
+      - simulated PMT voltage waveforms;
+
+    The tree is designed to be a*alyzed later with ROOT RDataFrame.*/
 
     TTree tree(
         "Events",
@@ -248,6 +332,18 @@ int main(
     std::cout << "Output ROOT file   : " << outputRoot << "\n";
     std::cout << "-------------------------------------\n";
 
+    /*
+    Main scan loop.
+
+    For each z position:
+      1. reset the GPU histograms;
+      2. launch the CUDA event-batch simulation;
+      3. copy the event-by-event arrival histograms back to the CPU;
+      4. build ROOT histograms for each event;
+      5. simulate the PMT waveform;
+      6. fill one entry per event in the output TTree.
+*/
+
     for (
         double zCenter = zStart;
         zCenter <= zEnd + 1e-9;
@@ -262,7 +358,7 @@ int main(
                   << zCenter
                   << " cm\n";
 
-        checkCuda(
+        checkCuda( //reset the GPU histograms to zero before launching the photon transport kernel
             cudaMemset(
                 dHistZ0,
                 0,
@@ -290,7 +386,7 @@ int main(
             "cudaEventRecord gpuStart"
         );
 
-        launchEventBatchArrivalHistogramKernel(
+        launchEventBatchArrivalHistogramKernel( //Launch the main GPU kernel
             dHistZ0,
             dHistZL,
             eventsPerPosition,
@@ -303,7 +399,7 @@ int main(
             nArrivalBins,
             positionSeed
         );
-
+        //routine errors check
         checkCuda(
             cudaGetLastError(),
             "launchEventBatchArrivalHistogramKernel"
@@ -332,9 +428,8 @@ int main(
 
         totalGpuTransportSeconds +=
             static_cast<double>(elapsedMs) * 1e-3;
-
         checkCuda(
-            cudaMemcpy(
+            cudaMemcpy(//copy the GPU histograms back to the CPU for further processing and waveform simulation
                 hHistZ0.data(),
                 dHistZ0,
                 histBytes,
@@ -363,7 +458,7 @@ int main(
             ++eventIdAtPosition
         )
         {
-            TH1D hArrZ0(
+            TH1D hArrZ0(//create ROOT histograms for the arrival times at the two PMT faces
                 makeName(
                     "h_arr_z0",
                     positionId,
@@ -399,7 +494,7 @@ int main(
             arrivalHistZ0.reserve(nArrivalBins);
             arrivalHistZL.reserve(nArrivalBins);
 
-            for (int bin = 0; bin < nArrivalBins; ++bin)
+            for (int bin = 0; bin < nArrivalBins; ++bin) //loop over the arrival time bins to fill the ROOT histograms and compute the mean arrival times
             {
                 int index =
                     eventIdAtPosition * nArrivalBins + bin;
@@ -470,7 +565,7 @@ int main(
                 );
 
             TH1D* hWaveZ0 =
-                SimulatePMTWaveformROOT(
+                SimulatePMTWaveformROOT(//simulate the PMT voltage waveform from the arrival time histogram
                     &hArrZ0,
                     waveNameZ0,
                     pmtRng,
@@ -490,11 +585,11 @@ int main(
             waveformZ0.clear();
             waveformZL.clear();
 
-            waveformZ0.reserve(nWaveformBins);
+            waveformZ0.reserve(nWaveformBins);//reserve space in the vectors to avoid reallocations during the loop
             waveformZL.reserve(nWaveformBins);
 
             for (int bin = 1; bin <= nWaveformBins; ++bin)
-            {
+            {//loop over the waveform bins to fill the vectors with the simulated PMT voltage waveforms
                 waveformZ0.push_back(
                     static_cast<float>(
                         hWaveZ0->GetBinContent(bin)
@@ -508,7 +603,7 @@ int main(
                 );
             }
 
-            tree.Fill();
+            tree.Fill();//fill the TTree with the event-level information and the simulated waveforms
 
             if (
                 positionId < 2 &&
