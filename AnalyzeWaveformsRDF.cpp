@@ -372,7 +372,7 @@ void AnalyzePropagationVelocityRDF(
 
     mainly used for debugging and validation of the analysis workflow.
     */
-*/
+
     dfTiming.Snapshot(
         "VelocityAnalysis",
         "analysis/propagation_velocity_analysis.root",
